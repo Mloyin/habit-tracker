@@ -3,40 +3,272 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HabitPulse - Dashboard</title>
+    <title>HabitPulse - Dashboard Kebiasaan & Streak</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Babel untuk JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-slate-950 text-white min-h-screen p-6">
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen pb-16">
     <div id="root"></div>
 
     <script type="text/babel">
-        function App() {
-            const [habits, setHabits] = React.useState([
-                { id: 1, name: 'Minum Air Putih', done: false },
-                { id: 2, name: 'Olahraga 15 Menit', done: false },
-                { id: 3, name: 'Membaca Buku', done: false }
-            ]);
+        const { useState, useEffect, useMemo } = React;
+        const { Flame, Plus, Check, ChevronLeft, ChevronRight, Calendar, Trash2, Edit3, Download, FileSpreadsheet, Sparkles } = lucide;
 
-            const toggleHabit = (id) => {
-                setHabits(habits.map(h => h.id === id ? { ...h, done: !h.done } : h));
+        function App() {
+            const today = useMemo(() => {
+                const d = new Date();
+                d.setHours(0, 0, 0, 0);
+                return d;
+            }, []);
+
+            const [habits, setHabits] = useState(() => {
+                const saved = localStorage.getItem('habitpulse_full_habits');
+                return saved ? JSON.parse(saved) : [
+                    { id: 1, name: 'Minum 2.5L Air Putih', category: 'Kesehatan', target: 7, logs: {} },
+                    { id: 2, name: 'Olahraga / Jalan Pagi', category: 'Kebugaran', target: 5, logs: {} },
+                    { id: 3, name: 'Membaca Buku 15 Halaman', category: 'Pengembangan', target: 6, logs: {} }
+                ];
+            });
+
+            const [activeTab, setActiveTab] = useState('daily');
+            const [selectedDate, setSelectedDate] = useState(today);
+            const [selectedCategory, setSelectedCategory] = useState('Semua');
+            const [newHabitName, setNewHabitName] = useState('');
+            const [newCategory, setNewCategory] = useState('Kesehatan');
+            const [weekOffset, setWeekOffset] = useState(0);
+
+            useEffect(() => {
+                localStorage.setItem('habitpulse_full_habits', JSON.stringify(habits));
+            }, [habits]);
+
+            const formatDateKey = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
             };
 
+            const selectedDateKey = formatDateKey(selectedDate);
+
+            const toggleLog = (habitId, dateObj) => {
+                const dateKey = formatDateKey(dateObj);
+                setHabits(habits.map(h => {
+                    if (h.id !== habitId) return h;
+                    const logs = { ...(h.logs || {}) };
+                    if (logs[dateKey]) {
+                        delete logs[dateKey];
+                    } else {
+                        logs[dateKey] = true;
+                    }
+                    return { ...h, logs };
+                }));
+            };
+
+            const addHabit = (e) => {
+                e.preventDefault();
+                if (!newHabitName.trim()) return;
+                const newH = {
+                    id: Date.now(),
+                    name: newHabitName.trim(),
+                    category: newCategory,
+                    target: 7,
+                    logs: {}
+                };
+                setHabits([...habits, newH]);
+                setNewHabitName('');
+            };
+
+            const deleteHabit = (id) => {
+                setHabits(habits.filter(h => h.id !== id));
+            };
+
+            const getStartOfWeek = (date) => {
+                const d = new Date(date);
+                const day = d.getDay();
+                const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                d.setDate(diff);
+                d.setHours(0, 0, 0, 0);
+                return d;
+            };
+
+            const activeWeekStart = useMemo(() => {
+                const baseStart = getStartOfWeek(today);
+                const result = new Date(baseStart);
+                result.setDate(result.getDate() + weekOffset * 7);
+                return result;
+            }, [today, weekOffset]);
+
+            const weekDays = useMemo(() => {
+                return Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date(activeWeekStart);
+                    d.setDate(d.getDate() + i);
+                    return d;
+                });
+            }, [activeWeekStart]);
+
+            const exportToCSV = () => {
+                let csvContent = "data:text/csv;charset=utf-8,Habit,Kategori,Target\n";
+                habits.forEach(h => {
+                    csvContent += `"${h.name}","${h.category}",${h.target}\n`;
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `laporan_habit_${formatDateKey(today)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            };
+
+            const filteredHabits = selectedCategory === 'Semua' ? habits : habits.filter(h => h.category === selectedCategory);
+
             return (
-                <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-                    <h1 className="text-xl font-bold mb-2">⚡ HabitPulse Dashboard</h1>
-                    <p className="text-xs text-slate-400 mb-6">Aplikasi pelacak kebiasaan harian Anda.</p>
-                    
-                    <div className="space-y-3">
-                        {habits.map(h => (
-                            <div key={h.id} onClick={() => toggleHabit(h.id)} className={`p-4 rounded-xl border cursor-pointer flex justify-between items-center transition ${h.done ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-200'}`}>
-                                <span className={h.done ? 'line-through opacity-75' : ''}>{h.name}</span>
-                                <span className="text-xs font-semibold">{h.done ? '✓ Selesai' : 'Belum'}</span>
-                            </div>
-                        ))}
+                <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
+                    {/* Header */}
+                    <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900 border border-slate-800 p-5 rounded-2xl gap-4 shadow-xl">
+                        <div>
+                            <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Flame className="w-6 h-6 text-amber-500 fill-amber-500/20" /> HabitPulse Dashboard
+                            </h1>
+                            <p className="text-xs text-slate-400">Kelola target harian & pantau weekly streak chart Anda.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={exportToCSV} className="px-3 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-600/30">
+                                <FileSpreadsheet className="w-4 h-4" /> Export Excel
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Navigasi Tab */}
+                    <div className="flex gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+                        <button onClick={() => setActiveTab('daily')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${activeTab === 'daily' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white'}`}>
+                            📅 Check-In Harian
+                        </button>
+                        <button onClick={() => setActiveTab('weekly')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${activeTab === 'weekly' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white'}`}>
+                            🔥 Weekly Streak Matrix
+                        </button>
+                        <button onClick={() => setActiveTab('manage')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${activeTab === 'manage' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white'}`}>
+                            ⚙️ Kelola Habit
+                        </button>
                     </div>
+
+                    {/* Tab 1: Daily Check-In */}
+                    {activeTab === 'daily' && (
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                <div className="flex gap-1.5 overflow-x-auto">
+                                    {['Semua', 'Kesehatan', 'Kebugaran', 'Pengembangan'].map(cat => (
+                                        <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${selectedCategory === cat ? 'bg-slate-800 text-white' : 'bg-slate-950 text-slate-400'}`}>
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+                                <input type="date" value={selectedDateKey} onChange={(e) => setSelectedDate(new Date(e.target.value))} className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                            </div>
+
+                            <div className="space-y-3">
+                                {filteredHabits.map(habit => {
+                                    const isDone = !!habit.logs?.[selectedDateKey];
+                                    return (
+                                        <div key={habit.id} onClick={() => toggleLog(habit.id, selectedDate)} className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition ${isDone ? 'bg-emerald-950/40 border-emerald-500/40' : 'bg-slate-950 border-slate-800'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center border ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-700'}`}>
+                                                    {isDone && <Check className="w-4 h-4 stroke-[3]" />}
+                                                </div>
+                                                <div>
+                                                    <h3 className={`font-medium text-sm ${isDone ? 'line-through text-slate-500' : 'text-white'}`}>{habit.name}</h3>
+                                                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">{habit.category}</span>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs text-slate-500">{isDone ? 'Selesai ✨' : 'Belum'}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tab 2: Weekly Streak Matrix */}
+                    {activeTab === 'weekly' && (
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl overflow-x-auto space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h2 className="font-bold text-base text-white">Weekly Streak Chart</h2>
+                                <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-1">
+                                    <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 text-slate-400 hover:text-white"><ChevronLeft className="w-4 h-4" /></button>
+                                    <span className="px-2 text-xs text-slate-300">
+                                        {weekDays[0].toLocaleDateString('id-ID', {day:'numeric', month:'short'})} - {weekDays[6].toLocaleDateString('id-ID', {day:'numeric', month:'short'})}
+                                    </span>
+                                    <button onClick={() => setWeekOffset(w => Math.min(0, w + 1))} className="p-1 text-slate-400 hover:text-white"><ChevronRight className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+
+                            <table className="w-full text-left border-collapse min-w-[550px]">
+                                <thead>
+                                    <tr className="border-b border-slate-800 text-xs text-slate-400">
+                                        <th className="pb-3">Habit</th>
+                                        {weekDays.map(d => (
+                                            <th key={formatDateKey(d)} className="pb-3 text-center">
+                                                {d.toLocaleDateString('id-ID', {weekday:'short'})} <br/> {d.getDate()}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {habits.map(habit => (
+                                        <tr key={habit.id}>
+                                            <td className="py-3 text-sm font-medium text-white">{habit.name}</td>
+                                            {weekDays.map(d => {
+                                                const key = formatDateKey(d);
+                                                const done = !!habit.logs?.[key];
+                                                return (
+                                                    <td key={key} className="py-3 text-center">
+                                                        <button disabled={d > today} onClick={() => toggleLog(habit.id, d)} className={`w-8 h-8 rounded-lg mx-auto flex items-center justify-center ${d > today ? 'opacity-30 bg-slate-950 cursor-not-allowed' : done ? 'bg-emerald-500 text-white' : 'bg-slate-950 border border-slate-800 text-slate-600'}`}>
+                                                            {done ? '✓' : '•'}
+                                                        </button>
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Tab 3: Kelola Habit */}
+                    {activeTab === 'manage' && (
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+                            <h2 className="font-bold text-base text-white">Tambah Habit Baru</h2>
+                            <form onSubmit={addHabit} className="flex flex-col sm:flex-row gap-2">
+                                <input type="text" placeholder="Nama habit baru..." value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)} className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                                    <option value="Kesehatan">Kesehatan</option>
+                                    <option value="Kebugaran">Kebugaran</option>
+                                    <option value="Pengembangan">Pengembangan</option>
+                                </select>
+                                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl">Tambah</button>
+                            </form>
+
+                            <div className="space-y-2 pt-2">
+                                <h3 className="text-xs font-bold uppercase text-slate-400">Daftar Habit Aktif</h3>
+                                {habits.map(habit => (
+                                    <div key={habit.id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                                        <span className="text-sm font-medium text-white">{habit.name}</span>
+                                        <button onClick={() => deleteHabit(habit.id)} className="text-rose-400 text-xs font-medium flex items-center gap-1 hover:text-rose-300">
+                                            <Trash2 className="w-4 h-4" /> Hapus
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
