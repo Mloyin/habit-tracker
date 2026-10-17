@@ -9,7 +9,7 @@
     <!-- React & Babel -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -31,6 +31,7 @@
             const [logs, setLogs] = useState({});
             const [activeTab, setActiveTab] = useState('daily');
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+            const [selectedCategory, setSelectedCategory] = useState('Semua');
             const [newHabitName, setNewHabitName] = useState('');
             const [newHabitCategory, setNewHabitCategory] = useState('Kesehatan');
             const [syncCode, setSyncCode] = useState(() => localStorage.getItem('habit_sync_code') || 'habit-pribadi-2026');
@@ -38,16 +39,16 @@
 
             // Load data dari LocalStorage
             useEffect(() => {
-                const savedHabits = localStorage.getItem('habitpulse_habits_full');
-                const savedLogs = localStorage.getItem('habitpulse_logs_full');
+                const savedHabits = localStorage.getItem('habitpulse_habits_v2');
+                const savedLogs = localStorage.getItem('habitpulse_logs_v2');
                 if (savedHabits) setHabits(JSON.parse(savedHabits));
                 if (savedLogs) setLogs(JSON.parse(savedLogs));
             }, []);
 
             // Auto-Save
             useEffect(() => {
-                localStorage.setItem('habitpulse_habits_full', JSON.stringify(habits));
-                localStorage.setItem('habitpulse_logs_full', JSON.stringify(logs));
+                localStorage.setItem('habitpulse_habits_v2', JSON.stringify(habits));
+                localStorage.setItem('habitpulse_logs_v2', JSON.stringify(logs));
                 localStorage.setItem('habit_sync_code', syncCode);
             }, [habits, logs, syncCode]);
 
@@ -79,7 +80,7 @@
                 setHabits(habits.filter(h => h.id !== id));
             };
 
-            // Hitung 7 hari ke belakang untuk Weekly Streak Matrix
+            // Hitung 7 hari ke belakang untuk Weekly Streak Matrix & Bar Chart
             const getPast7Days = () => {
                 const dates = [];
                 for (let i = 6; i >= 0; i--) {
@@ -91,6 +92,11 @@
             };
 
             const weekDays = getPast7Days();
+
+            // Filter habit berdasarkan kategori
+            const filteredHabits = selectedCategory === 'Semua' 
+                ? habits 
+                : habits.filter(h => h.category === selectedCategory);
 
             const exportToCSV = () => {
                 let csvContent = "data:text/csv;charset=utf-8,Habit,Kategori,Tanggal,Status\n";
@@ -118,7 +124,7 @@
                             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                                 ⚡ HabitPulse Dashboard
                             </h1>
-                            <p className="text-sm text-slate-500">Kelola target harian & pantau weekly streak chart Anda.</p>
+                            <p className="text-sm text-slate-500">Kelola target harian, weekly streak, dan analitik progress Anda.</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                             <button onClick={() => setShowSyncModal(true)} className="px-3.5 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl text-sm font-medium transition">
@@ -138,6 +144,9 @@
                         <button onClick={() => setActiveTab('weekly')} className={`px-4 py-2 rounded-xl font-medium text-sm transition whitespace-nowrap ${activeTab === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100'}`}>
                             🔥 Weekly Streak Matrix
                         </button>
+                        <button onClick={() => setActiveTab('analytics')} className={`px-4 py-2 rounded-xl font-medium text-sm transition whitespace-nowrap ${activeTab === 'analytics' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100'}`}>
+                            📊 Statistik & Grafik
+                        </button>
                         <button onClick={() => setActiveTab('manage')} className={`px-4 py-2 rounded-xl font-medium text-sm transition whitespace-nowrap ${activeTab === 'manage' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100'}`}>
                             ⚙️ Kelola Habit
                         </button>
@@ -146,12 +155,18 @@
                     {/* Tab 1: Daily Check-In */}
                     {activeTab === 'daily' && (
                         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="font-bold text-lg text-slate-800">Check-In Hari Ini</h2>
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                                <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+                                    {['Semua', 'Kesehatan', 'Kebugaran', 'Pengembangan', 'Spiritual', 'Karier'].map(cat => (
+                                        <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap ${selectedCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
                                 <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="px-3 py-1.5 border rounded-xl text-sm" />
                             </div>
                             <div className="space-y-3">
-                                {habits.map(habit => {
+                                {filteredHabits.map(habit => {
                                     const isChecked = logs[habit.id]?.[selectedDate] || false;
                                     return (
                                         <div key={habit.id} onClick={() => toggleLog(habit.id, selectedDate)} className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition ${isChecked ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
@@ -175,7 +190,7 @@
                     {/* Tab 2: Weekly Streak Matrix Chart */}
                     {activeTab === 'weekly' && (
                         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 overflow-x-auto">
-                            <h2 className="font-bold text-lg text-slate-800 mb-1">Weekly Streak Chart</h2>
+                            <h2 className="font-bold text-lg text-slate-800 mb-1">Weekly Streak Board</h2>
                             <p className="text-sm text-slate-500 mb-4">Klik kotak tanggal di bawah untuk menandai atau membatalkan status habit.</p>
                             <table className="w-full text-left border-collapse min-w-[600px]">
                                 <thead>
@@ -207,12 +222,40 @@
                         </div>
                     )}
 
-                    {/* Tab 3: Kelola Habit */}
+                    {/* Tab 3: Statistik & Grafik Batang */}
+                    {activeTab === 'analytics' && (
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                            <h2 className="font-bold text-lg text-slate-800 mb-1">Grafik Konsistensi Harian</h2>
+                            <p className="text-sm text-slate-500 mb-6">Persentase penyelesaian habit dalam 7 hari terakhir.</p>
+                            
+                            <div className="space-y-4">
+                                {weekDays.map(date => {
+                                    const totalHabits = habits.length;
+                                    const completedCount = habits.filter(h => logs[h.id]?.[date]).length;
+                                    const percentage = totalHabits > 0 ? Math.round((completedCount / totalHabits) * 100) : 0;
+
+                                    return (
+                                        <div key={date} className="space-y-1">
+                                            <div className="flex justify-between text-xs font-medium text-slate-600">
+                                                <span>{date}</span>
+                                                <span>{completedCount} dari {totalHabits} selesai ({percentage}%)</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                                                <div className="bg-indigo-600 h-full transition-all duration-500" style={{ width: `${percentage}%` }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tab 4: Kelola Habit */}
                     {activeTab === 'manage' && (
                         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                             <h2 className="font-bold text-lg text-slate-800 mb-4">Tambah Habit Baru</h2>
                             <form onSubmit={addHabit} className="flex flex-col sm:flex-row gap-3 mb-6">
-                                <input type="text" value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)} placeholder="Nama habit baru (contoh: Olahraga pagi)..." className="flex-1 px-4 py-2 border rounded-xl text-sm" />
+                                <input type="text" value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)} placeholder="Nama habit baru (contoh: Menulis jurnal)..." className="flex-1 px-4 py-2 border rounded-xl text-sm" />
                                 <select value={newHabitCategory} onChange={(e) => setNewHabitCategory(e.target.value)} className="px-4 py-2 border rounded-xl text-sm bg-white">
                                     <option value="Kesehatan">Kesehatan</option>
                                     <option value="Kebugaran">Kebugaran</option>
@@ -243,7 +286,7 @@
                         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
                                 <h3 className="text-lg font-bold text-slate-900 mb-2">Kode Sinkronisasi Data</h3>
-                                <p className="text-sm text-slate-500 mb-4">Gunakan kode ini di HP Anda agar tersinkron.</p>
+                                <p className="text-sm text-slate-500 mb-4">Gunakan kode ini di HP atau perangkat lain agar tersinkron.</p>
                                 <input type="text" value={syncCode} onChange={(e) => setSyncCode(e.target.value)} className="w-full px-4 py-2 border rounded-xl mb-4 text-sm font-mono" />
                                 <div className="flex justify-end">
                                     <button onClick={() => setShowSyncModal(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium">Tutup</button>
